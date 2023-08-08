@@ -1,0 +1,458 @@
+name: build-musl-cross-toolchains-on-ubuntu
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_date:
+        description: 'Build date(e.g. 20200202)'
+        required: true
+
+env:
+  ARTIFACT_RETENTION_DAYS: '3'
+  CONFIG_SUB_REVISE: 'd4e37b5868ef'
+  BINUTILS_VERSION: '2.40'
+  GCC_VERSION: '11.4.0'
+  MUSL_VERSION: '1.2.4'
+  GMP_VERSION: '6.2.1'
+  MPC_VERSION: '1.2.1'
+  MPFR_VERSION: '4.2.0'
+  ISL_VERSION: '0.26'
+  LINUX_VERSION: '6.1.36'
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+        with:
+          ref: pkg-build
+          fetch-depth: 1
+          path: ./
+
+      - name: Build native x86_64 bootstrap musl compiler
+        run: |
+          mkdir -p ${{ github.workspace }}/local/musl/bootstrap
+
+          cat > config.mak << EOF
+          TARGET = x86_64-linux-musl
+          OUTPUT = ${{ github.workspace }}/local/musl/bootstrap
+          
+          DL_CMD = curl -sL4 --connect-timeout 5 --retry 5 --retry-delay 5 --retry-max-time 25 -o
+          COMMON_CONFIG += CC="gcc -static --static"
+          COMMON_CONFIG += CXX="g++ -static --static"
+          COMMON_CONFIG += FC="gfortran -static --static"
+          COMMON_CONFIG += CFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+          COMMON_CONFIG += CXXFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+          COMMON_CONFIG += FFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+          COMMON_CONFIG += LDFLAGS="-s -static --static -Wl,--build-id=sha1"
+          COMMON_CONFIG += --disable-gprofng
+          BINUTILS_CONFIG += --enable-gold=yes
+          GCC_CONFIG += --enable-default-pie
+          GCC_CONFIG += --enable-static-pie
+          GCC_CONFIG += --disable-cet
+
+          CONFIG_SUB_REV = ${{ env.CONFIG_SUB_REVISE }}
+          GCC_VER = ${{ env.GCC_VERSION }}
+          BINUTILS_VER = ${{ env.BINUTILS_VERSION }}
+          MUSL_VER = ${{ env.MUSL_VERSION }}
+          GMP_VER = ${{ env.GMP_VERSION }}
+          MPC_VER = ${{ env.MPC_VERSION }}
+          MPFR_VER = ${{ env.MPFR_VERSION }}
+          ISL_VER = ${{ env.ISL_VERSION }}
+          LINUX_VER = ${{ env.LINUX_VERSION }}
+          EOF
+
+          make install -j$(nproc)
+          make clean
+          
+      - name: Package bootstrap toolchains
+        shell: sh
+        run: |
+          [ -h ${{ github.workspace }}/local/musl/bootstrap/usr ] || (cd ${{ github.workspace }}/local/musl/bootstrap && ln -s . usr)
+          [ -e ${{ github.workspace }}/local/musl/native-x86_64-bootstrap-musl-compiler.tgz ] || (cd ${{ github.workspace }}/local/musl && tar pczf native-x86_64-bootstrap-musl-compiler.tgz bootstrap)
+         
+      - name: Upload Bootstrap Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: native-x86_64-bootstrap-musl-compiler
+          path: ${{ github.workspace }}/local/musl/native-x86_64-bootstrap-musl-compiler.tgz
+  
+  build:
+    name: Toolchains
+    needs: bootstrap
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        triples: 
+          - {
+              arch_type: 'aarch64-linux-musl',
+              arch_config: '--with-arch=armv8-a --with-abi=lp64'
+            }
+          - {
+              arch_type: 'aarch64_be-linux-musl',
+              arch_config: '--with-arch=armv8-a --with-abi=lp64'
+            }
+          - {
+              arch_type: 'arm-linux-musleabi',
+              arch_config: '--with-arch=armv5te --with-tune=arm926ej-s --with-float=soft --with-abi=aapcs-linux'
+            }
+          - {
+              arch_type: 'arm-linux-musleabihf',
+              arch_config: '--with-arch=armv6zk --with-tune=arm1176jzf-s --with-fpu=vfp --with-float=hard --with-abi=aapcs-linux'
+            }
+          - {
+              arch_type: 'armeb-linux-musleabi',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'armeb-linux-musleabihf',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'armel-linux-musleabi',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'armel-linux-musleabihf',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'armv5l-linux-musleabi',
+              arch_config: '--with-arch=armv5te --with-tune=arm926ej-s --with-float=soft --with-abi=aapcs-linux'
+            }
+          - {
+              arch_type: 'armv5l-linux-musleabihf',
+              arch_config: ''
+            }  
+          - {
+              arch_type: 'armv6-linux-musleabi',
+              arch_config: ''
+            }  
+          - {
+              arch_type: 'armv6-linux-musleabihf',
+              arch_config: '--with-arch=armv6zk --with-tune=arm1176jzf-s --with-fpu=vfp --with-float=hard --with-abi=aapcs-linux'
+            }  
+          - {
+              arch_type: 'armv7l-linux-musleabihf',
+              arch_config: '--with-arch=armv7-a --with-tune=generic-armv7-a --with-fpu=vfpv3-d16 --with-float=hard --with-abi=aapcs-linux --with-mode=thumb'
+            }  
+          - {
+              arch_type: 'armv7m-linux-musleabi',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'armv7r-linux-musleabihf',
+              arch_config: '--with-arch=armv7-a --with-tune=generic-armv7-a --with-fpu=vfpv3-d16 --with-float=hard --with-abi=aapcs-linux --with-mode=thumb'
+            } 
+          - {
+              arch_type: 'i486-linux-musl',
+              arch_config: '--with-arch=i486 --with-tune=generic --enable-cld'
+            } 
+          - {
+              arch_type: 'i686-linux-musl',
+              arch_config: '--with-arch=i686 --with-tune=generic --enable-cld'
+            }
+          # - {
+          #     arch_type: 'm68k-linux-musl',
+          #     arch_config: ''
+          #   } 
+          # - {
+          #     arch_type: 'microblaze-linux-musl',
+          #     arch_config: ''
+          #   } 
+          # - {
+          #     arch_type: 'microblazeel-linux-musl',
+          #     arch_config: ''
+          #   } 
+          - {
+              arch_type: 'mips-linux-musl',
+              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
+            }
+          - {
+              arch_type: 'mips-linux-muslsf',
+              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
+            }
+          - {
+              arch_type: 'mips-linux-musln32sf',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'mips64-linux-musl',
+              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64'
+            }
+          - {
+              arch_type: 'mips64-linux-musln32',
+              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
+            }
+          - {
+              arch_type: 'mips64-linux-musln32sf',
+              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
+            }
+          - {
+              arch_type: 'mips64el-linux-musl',
+              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64'
+            }
+          - {
+              arch_type: 'mips64el-linux-musln32',
+              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
+            }
+          - {
+              arch_type: 'mips64el-linux-musln32sf',
+              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
+            }
+          - {
+              arch_type: 'mipsel-linux-musl',
+              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
+            }
+          - {
+              arch_type: 'mipsel-linux-musln32',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'mipsel-linux-musln32sf',
+              arch_config: ''
+            }
+          - {
+              arch_type: 'mipsel-linux-muslsf',
+              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
+            }
+          # - {
+          #     arch_type: 'or1k-linux-musl',
+          #     arch_config: ''
+          #   }
+          - {
+              arch_type: 'powerpc-linux-musl',
+              arch_config: '--enable-secureplt --enable-decimal-float=no'
+            }
+          # - {
+          #     arch_type: 'powerpc-linux-muslsf',
+          #     arch_config: '--enable-secureplt --enable-decimal-float=no'
+          #   }
+          - {
+              arch_type: 'powerpc64-linux-musl',
+              arch_config: '--with-abi=elfv2 --enable-secureplt --enable-decimal-float=no --enable-targets=powerpcle-linux'
+            }
+          - {
+              arch_type: 'powerpc64le-linux-musl',
+              arch_config: '--with-abi=elfv2 --enable-secureplt --enable-decimal-float=no --enable-targets=powerpcle-linux'
+            }
+          - {
+              arch_type: 'powerpcle-linux-musl',
+              arch_config: '--enable-secureplt --enable-decimal-float=no'
+            }
+          # - {
+          #     arch_type: 'powerpcle-linux-muslsf',
+          #     arch_config: '--enable-secureplt --enable-decimal-float=no'
+          #   }
+          # - {
+          #     arch_type: 'riscv32-linux-musl',
+          #     arch_config: ''
+          #   }
+          - {
+              arch_type: 'riscv64-linux-musl',
+              arch_config: '--with-arch=rv64gc --with-abi=lp64d --enable-autolink-libatomic'
+            }
+          - {
+              arch_type: 's390x-linux-musl',
+              arch_config: '--with-arch=z196 --with-tune=zEC12 --with-zarch --with-long-double-128 --enable-decimal-float'
+            }
+          - {
+              arch_type: 'x86_64-linux-musl',
+              arch_config: ''
+            }
+          # - {
+          #     arch_type: 'x86_64-linux-muslx32',
+          #     arch_config: ''
+          #   }
+          # - {
+          #     arch_type: 'sh2-linux-musl',
+          #     arch_config: ''
+          #   }
+          # - {
+          #     arch_type: 'sh2-linux-muslfdpic',
+          #     arch_config: ''
+          #   }
+          # - {
+          #     arch_type: 'sh2eb-linux-musl',
+          #     arch_config: ''
+          #   }
+          # - {
+          #     arch_type: 'sh2eb-linux-muslfdpic',
+          #     arch_config: ''
+          #   }
+          # - {
+          #     arch_type: 'sh4-linux-musl',
+          #     arch_config: ''
+          #   }
+          # - {
+          #     arch_type: 'sh4eb-linux-musl',
+          #     arch_config: ''
+          #   }
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+        with:
+          ref: pkg-build
+          fetch-depth: 1
+          path: ./
+
+      - name: Donwload Bootstrap Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: native-x86_64-bootstrap-musl-compiler
+          path: ${{ github.workspace }}/local/musl/bootstrap-archive
+      
+      - name: Unpack native-x86_64-bootstrap-musl-compiler artifact
+        run: |
+          mkdir -p ${{ github.workspace }}/local/musl/bootstrap
+          tar -xf ${{ github.workspace }}/local/musl/bootstrap-archive/native-x86_64-bootstrap-musl-compiler.tgz --strip-components 1 -C ${{ github.workspace }}/local/musl/bootstrap
+
+      - name: Build native musl cross compiler targeting ${{ matrix.triples.arch_type }}
+        env:
+          TARGET: ${{ matrix.triples.arch_type }}
+        run: |
+          cat > config.mak << EOF
+          TARGET = ${TARGET}
+          OUTPUT = ${{ github.workspace }}/output/${TARGET}-cross
+
+          DL_CMD = curl -sL4 --connect-timeout 5 --retry 5 --retry-delay 5 --retry-max-time 25 -o
+          COMMON_CONFIG += CC="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-gcc -static --static"
+          COMMON_CONFIG += CXX="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-g++ -static --static"
+          COMMON_CONFIG += FC="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-gfortran -static --static"
+          COMMON_CONFIG += CFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+          COMMON_CONFIG += CXXFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+          COMMON_CONFIG += FFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+          COMMON_CONFIG += LDFLAGS="-s -static --static -Wl,--build-id=sha1"
+          COMMON_CONFIG += ${{ matrix.triples.arch_config }} --disable-gprofng
+          BINUTILS_CONFIG += --enable-gold=yes
+          GCC_CONFIG += --enable-default-pie
+          GCC_CONFIG += --enable-static-pie
+          GCC_CONFIG += --disable-cet
+
+          CONFIG_SUB_REV = ${{ env.CONFIG_SUB_REVISE }}
+          GCC_VER = ${{ env.GCC_VERSION }}
+          BINUTILS_VER = ${{ env.BINUTILS_VERSION }}
+          MUSL_VER = ${{ env.MUSL_VERSION }}
+          GMP_VER = ${{ env.GMP_VERSION }}
+          MPC_VER = ${{ env.MPC_VERSION }}
+          MPFR_VER = ${{ env.MPFR_VERSION }}
+          ISL_VER = ${{ env.ISL_VERSION }}
+          LINUX_VER = ${{ env.LINUX_VERSION }}
+          EOF
+          make install -j$(nproc)
+          make clean
+
+      - name: Package musl cross toolchains
+        env:
+          TARGET: ${{ matrix.triples.arch_type }}
+        shell: sh
+        run: |
+          rm -fr ${{ github.workspace }}/build/local/${TARGET}
+
+          [ -h ${{ github.workspace }}/output/${TARGET}-cross/usr ] || (cd ${{ github.workspace }}/output/${TARGET}-cross && ln -s . usr)
+          [ -e ${{ github.workspace }}/output/${TARGET}-cross.tgz ] || (cd ${{ github.workspace }}/output && tar pczf ${TARGET}-cross.tgz ${TARGET}-cross)
+      
+      # - name: Build native ${{ matrix.triples.arch_type }} musl compiler
+      #   env:
+      #     TARGET: ${{ matrix.triples.arch_type }}
+      #   run: |
+      #     mkdir -p ${{ github.workspace }}/output/${TARGET}-native
+      #     cat > config.mak << EOF
+      #     TARGET = ${TARGET}
+      #     OUTPUT = ${{ github.workspace }}/output/${TARGET}-native
+
+      #     DL_CMD = curl -sL4 --connect-timeout 5 --retry 5 --retry-delay 5 --retry-max-time 25 -o
+      #     COMMON_CONFIG += CC="${{ github.workspace }}/output/${TARGET}-cross/bin/${TARGET}-gcc -static --static"
+      #     COMMON_CONFIG += CXX="/${{ github.workspace }}/output/${TARGET}-cross/bin/${TARGET}-g++ -static --static"
+      #     COMMON_CONFIG += FC="${{ github.workspace }}/output/${TARGET}-cross/bin/${TARGET}-gfortran -static --static"
+      #     COMMON_CONFIG += CFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+      #     COMMON_CONFIG += CXXFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+      #     COMMON_CONFIG += FFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+      #     COMMON_CONFIG += LDFLAGS="-s -static --static -Wl,--build-id=sha1"
+      #     COMMON_CONFIG += ${{ matrix.triples.arch_config }} --disable-gprofng
+      #     BINUTILS_CONFIG += --enable-gold=yes
+      #     GCC_CONFIG += --enable-default-pie
+      #     GCC_CONFIG += --enable-static-pie
+      #     GCC_CONFIG += --disable-cet
+
+      #     CONFIG_SUB_REV = ${{ env.CONFIG_SUB_REVISE }}
+      #     GCC_VER = ${{ env.GCC_VERSION }}
+      #     BINUTILS_VER = ${{ env.BINUTILS_VERSION }}
+      #     MUSL_VER = ${{ env.MUSL_VERSION }}
+      #     GMP_VER = ${{ env.GMP_VERSION }}
+      #     MPC_VER = ${{ env.MPC_VERSION }}
+      #     MPFR_VER = ${{ env.MPFR_VERSION }}
+      #     ISL_VER = ${{ env.ISL_VERSION }}
+      #     LINUX_VER = ${{ env.LINUX_VERSION }}
+      #     EOF
+      #     make install -j$(nproc)
+      #     make clean
+
+      # - name: Package musl native toolchains
+      #   env:
+      #     TARGET: ${{ matrix.triples.arch_type }}
+      #   shell: sh
+      #   run: |
+      #     rm -fr ${{ github.workspace }}/output/${TARGET}-cross;
+
+      #     [ -h ${{ github.workspace }}/output/${TARGET}-native/usr ] || (cd ${{ github.workspace }}/output/${TARGET}-native && ln -s . usr)
+      #     [ -e ${{ github.workspace }}/output/${TARGET}-native.tgz ] || (cd ${{ github.workspace }}/output && tar pczf ${TARGET}-native.tgz ${TARGET}-native)
+
+      #     rm -fr ${{ github.workspace }}/build/${TARGET}
+      #     rm -fr ${{ github.workspace }}/output/${TARGET}-native;
+
+      # - name: Build & package musl toolchains
+      #   env:
+      #     TARGET: ${{ matrix.triples.arch_type }}
+      #   run: |
+      #     cat > config.mak << EOF
+      #     DL_CMD = curl -sL4 --connect-timeout 5 --retry 5 --retry-delay 5 --retry-max-time 25 -o
+      #     ifneq ($(NATIVE),)
+      #     COMMON_CONFIG += CC="$(TARGET)-gcc -static --static" CXX="$(TARGET)-g++ -static --static" FC="$(TARGET)-gfortran -static --static"
+      #     else
+      #     COMMON_CONFIG += CC="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-gcc -static --static" CXX="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-g++ -static --static" FC="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-gfortran -static --static"
+      #     endif
+
+      #     COMMON_CONFIG += CFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+      #     COMMON_CONFIG += CXXFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+      #     COMMON_CONFIG += FFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
+      #     COMMON_CONFIG += LDFLAGS="-s -static --static -Wl,--build-id=sha1"
+      #     COMMON_CONFIG += ${{ matrix.triples.arch_config }} --disable-gprofng
+      #     BINUTILS_CONFIG += --enable-gold=yes
+      #     GCC_CONFIG += --enable-default-pie
+      #     GCC_CONFIG += --enable-static-pie
+      #     GCC_CONFIG += --disable-cet
+
+      #     CONFIG_SUB_REV = ${{ env.CONFIG_SUB_REVISE }}
+      #     GCC_VER = ${{ env.GCC_VERSION }}
+      #     BINUTILS_VER = ${{ env.BINUTILS_VERSION }}
+      #     MUSL_VER = ${{ env.MUSL_VERSION }}
+      #     GMP_VER = ${{ env.GMP_VERSION }}
+      #     MPC_VER = ${{ env.MPC_VERSION }}
+      #     MPFR_VER = ${{ env.MPFR_VERSION }}
+      #     ISL_VER = ${{ env.ISL_VERSION }}
+      #     LINUX_VER = ${{ env.LINUX_VERSION }}
+      #     EOF
+      #     sh ./scripts/build ${TARGET}
+
+      - name: Upload
+        uses: actions/upload-artifact@v3
+        with:
+          path: ${{ github.workspace }}/output
+          name: ${{ matrix.triples.arch_type }}
+          if-no-files-found: error
+          retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ github.token }}
+          file: ${{ github.workspace }}/output/*.tgz
+          tag: v${{ github.event.inputs.build_date }}
+          file_glob: true
+          release_name: 'Release Toolchains ${{ github.event.inputs.build_date }}'
+          overwrite: true
+          prerelease: false
+          body: 'Static cross- musl-based toolchains. Built `${{ github.event.inputs.build_date }}`.'
