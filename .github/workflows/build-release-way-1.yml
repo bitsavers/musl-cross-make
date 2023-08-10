@@ -70,7 +70,7 @@ jobs:
         shell: sh
         run: |
           [ -h ${{ github.workspace }}/local/musl/bootstrap/usr ] || (cd ${{ github.workspace }}/local/musl/bootstrap && ln -s . usr)
-          [ -e ${{ github.workspace }}/local/musl/bootstrap/x86_64-linux-musl-cross.tgz ] || (cd ${{ github.workspace }}/local/musl && tar pczf native-x86_64-bootstrap-musl-compiler.tgz bootstrap)
+          [ -e ${{ github.workspace }}/local/musl/bootstrap/native-x86_64-bootstrap-musl-compiler.tgz ] || (cd ${{ github.workspace }}/local/musl && tar pczf native-x86_64-bootstrap-musl-compiler.tgz bootstrap)
          
       - name: Upload Bootstrap Artifact
         uses: actions/upload-artifact@v3
