@@ -307,7 +307,7 @@ jobs:
       - name: Unpack native-x86_64-bootstrap-musl-compiler artifact
         run: |
           mkdir -p ${{ github.workspace }}/local/musl/bootstrap
-          tar -xf {{ github.workspace }}/local/musl/bootstrap-archive/native-x86_64-bootstrap-musl-compiler/native-x86_64-bootstrap-musl-compiler.tgz --strip-components 1 -C ${{ github.workspace }}/local/musl/bootstrap
+          tar -xf ${{ github.workspace }}/local/musl/bootstrap-archive/native-x86_64-bootstrap-musl-compiler.tgz --strip-components 1 -C ${{ github.workspace }}/local/musl/bootstrap
 
       - name: Build native musl cross compiler targeting ${{ matrix.triples.arch_type }}
         env:
