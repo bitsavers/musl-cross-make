@@ -65,12 +65,18 @@ jobs:
 
           make install -j$(nproc)
           make clean
-   
+          
+      - name: Package bootstrap toolchains
+        shell: sh
+        run: |
+          [ -h ${{ github.workspace }}/local/musl/bootstrap/usr ] || (cd ${{ github.workspace }}/local/musl/bootstrap && ln -s . usr)
+          [ -e ${{ github.workspace }}/local/musl/bootstrap/x86_64-linux-musl-cross.tgz ] || (cd ${{ github.workspace }}/local/musl && tar pczf native-x86_64-bootstrap-musl-compiler.tgz bootstrap)
+         
       - name: Upload Bootstrap Artifact
         uses: actions/upload-artifact@v3
         with:
           name: native-x86_64-bootstrap-musl-compiler
-          path: ${{ github.workspace }}/local/musl/bootstrap
+          path: ${{ github.workspace }}/local/musl/native-x86_64-bootstrap-musl-compiler.tgz
   
   build:
     name: Toolchains
@@ -297,6 +303,11 @@ jobs:
         with:
           name: native-x86_64-bootstrap-musl-compiler
           path: ${{ github.workspace }}/local/musl/bootstrap-archive
+      
+      - name: Unpack native-x86_64-bootstrap-musl-compiler artifact
+        run: |
+          mkdir -p ${{ github.workspace }}/local/musl/bootstrap
+          tar -xf {{ github.workspace }}/local/musl/bootstrap-archive/native-x86_64-bootstrap-musl-compiler.tgz --strip-components 1 -C ${{ github.workspace }}/local/musl/bootstrap
 
       - name: Build native musl cross compiler targeting ${{ matrix.triples.arch_type }}
         env:
@@ -307,9 +318,9 @@ jobs:
           OUTPUT = ${{ github.workspace }}/output/${TARGET}-cross
 
           DL_CMD = curl -sL4 --connect-timeout 5 --retry 5 --retry-delay 5 --retry-max-time 25 -o
-          COMMON_CONFIG += CC="${{ github.workspace }}/local/musl/bootstrap-archive/bin/x86_64-linux-musl-gcc -static --static"
-          COMMON_CONFIG += CXX="${{ github.workspace }}/local/musl/bootstrap-archive/bin/x86_64-linux-musl-g++ -static --static"
-          COMMON_CONFIG += FC="${{ github.workspace }}/local/musl/bootstrap-archive/bin/x86_64-linux-musl-gfortran -static --static"
+          COMMON_CONFIG += CC="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-gcc -static --static"
+          COMMON_CONFIG += CXX="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-g++ -static --static"
+          COMMON_CONFIG += FC="${{ github.workspace }}/local/musl/bootstrap/bin/x86_64-linux-musl-gfortran -static --static"
           COMMON_CONFIG += CFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
           COMMON_CONFIG += CXXFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
           COMMON_CONFIG += FFLAGS="-g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error"
