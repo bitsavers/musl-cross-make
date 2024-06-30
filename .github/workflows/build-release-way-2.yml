@@ -1,27 +1,27 @@
-name: build-musl-cross-toolchains-on-alpine
-
+name: build-musl-cross-toolchains-on-alpine(don't use this)
 on:
   workflow_dispatch:
     inputs:
       build_date:
         description: 'Build date(e.g. 20200202)'
         required: true
-
 env:
   ARTIFACT_RETENTION_DAYS: '3'
-  CONFIG_SUB_REVISE: 'd4e37b5868ef'
+  # goto "https://git.savannah.gnu.org/gitweb/?p=config.git;a=tree" -> click blob of config.sub -> short commit id
+  # (https://git.savannah.gnu.org/gitweb/?p=config.git;a=commit;h=HEAD)
+  # e.g. https://git.savannah.gnu.org/gitweb/?p=config.git;a=blob_plain;f=config.sub;hb=948ae97ca570
+  CONFIG_SUB_REVISE: '948ae97ca570'
   BINUTILS_VERSION: '2.40'
   GCC_VERSION: '11.4.0'
-  MUSL_VERSION: '1.2.4'
+  MUSL_VERSION: '1.2.5'
   GMP_VERSION: '6.2.1'
   MPC_VERSION: '1.2.1'
   MPFR_VERSION: '4.2.0'
   ISL_VERSION: '0.26'
   LINUX_VERSION: '6.1.36'
-
 jobs:
   build:
-    name: Toolchains 
+    name: Toolchains
     runs-on: ubuntu-latest
     container:
       image: amd64/alpine:edge
@@ -30,75 +30,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        triples: 
-          - {
-              arch_type: 'aarch64-linux-musl',
-              arch_config: '--with-arch=armv8-a --with-abi=lp64'
-            }
-          - {
-              arch_type: 'aarch64_be-linux-musl',
-              arch_config: '--with-arch=armv8-a --with-abi=lp64'
-            }
-          - {
-              arch_type: 'arm-linux-musleabi',
-              arch_config: '--with-arch=armv5te --with-tune=arm926ej-s --with-float=soft --with-abi=aapcs-linux'
-            }
-          - {
-              arch_type: 'arm-linux-musleabihf',
-              arch_config: '--with-arch=armv6zk --with-tune=arm1176jzf-s --with-fpu=vfp --with-float=hard --with-abi=aapcs-linux'
-            }
-          - {
-              arch_type: 'armeb-linux-musleabi',
-              arch_config: ''
-            }
-          - {
-              arch_type: 'armeb-linux-musleabihf',
-              arch_config: ''
-            }
-          - {
-              arch_type: 'armel-linux-musleabi',
-              arch_config: ''
-            }
-          - {
-              arch_type: 'armel-linux-musleabihf',
-              arch_config: ''
-            }
-          - {
-              arch_type: 'armv5l-linux-musleabi',
-              arch_config: '--with-arch=armv5te --with-tune=arm926ej-s --with-float=soft --with-abi=aapcs-linux'
-            }
-          - {
-              arch_type: 'armv5l-linux-musleabihf',
-              arch_config: ''
-            }  
-          - {
-              arch_type: 'armv6-linux-musleabi',
-              arch_config: ''
-            }  
-          - {
-              arch_type: 'armv6-linux-musleabihf',
-              arch_config: '--with-arch=armv6zk --with-tune=arm1176jzf-s --with-fpu=vfp --with-float=hard --with-abi=aapcs-linux'
-            }  
-          - {
-              arch_type: 'armv7l-linux-musleabihf',
-              arch_config: '--with-arch=armv7-a --with-tune=generic-armv7-a --with-fpu=vfpv3-d16 --with-float=hard --with-abi=aapcs-linux --with-mode=thumb'
-            }  
-          - {
-              arch_type: 'armv7m-linux-musleabi',
-              arch_config: ''
-            }
-          - {
-              arch_type: 'armv7r-linux-musleabihf',
-              arch_config: '--with-arch=armv7-a --with-tune=generic-armv7-a --with-fpu=vfpv3-d16 --with-float=hard --with-abi=aapcs-linux --with-mode=thumb'
-            } 
-          - {
-              arch_type: 'i486-linux-musl',
-              arch_config: '--with-arch=i486 --with-tune=generic --enable-cld'
-            } 
-          - {
-              arch_type: 'i686-linux-musl',
-              arch_config: '--with-arch=i686 --with-tune=generic --enable-cld'
-            }
+        triples:
+          - {arch_type: 'aarch64-linux-musl', arch_config: '--with-arch=armv8-a --with-abi=lp64'}
+          - {arch_type: 'aarch64_be-linux-musl', arch_config: '--with-arch=armv8-a --with-abi=lp64'}
+          - {arch_type: 'arm-linux-musleabi', arch_config: '--with-arch=armv5te --with-tune=arm926ej-s --with-float=soft --with-abi=aapcs-linux'}
+          - {arch_type: 'arm-linux-musleabihf', arch_config: '--with-arch=armv6zk --with-tune=arm1176jzf-s --with-fpu=vfp --with-float=hard --with-abi=aapcs-linux'}
+          - {arch_type: 'armeb-linux-musleabi', arch_config: ''}
+          - {arch_type: 'armeb-linux-musleabihf', arch_config: ''}
+          - {arch_type: 'armel-linux-musleabi', arch_config: ''}
+          - {arch_type: 'armel-linux-musleabihf', arch_config: ''}
+          - {arch_type: 'armv5l-linux-musleabi', arch_config: '--with-arch=armv5te --with-tune=arm926ej-s --with-float=soft --with-abi=aapcs-linux'}
+          - {arch_type: 'armv5l-linux-musleabihf', arch_config: ''}
+          - {arch_type: 'armv6-linux-musleabi', arch_config: ''}
+          - {arch_type: 'armv6-linux-musleabihf', arch_config: '--with-arch=armv6zk --with-tune=arm1176jzf-s --with-fpu=vfp --with-float=hard --with-abi=aapcs-linux'}
+          - {arch_type: 'armv7l-linux-musleabihf', arch_config: '--with-arch=armv7-a --with-tune=generic-armv7-a --with-fpu=vfpv3-d16 --with-float=hard --with-abi=aapcs-linux --with-mode=thumb'}
+          - {arch_type: 'armv7m-linux-musleabi', arch_config: ''}
+          - {arch_type: 'armv7r-linux-musleabihf', arch_config: '--with-arch=armv7-a --with-tune=generic-armv7-a --with-fpu=vfpv3-d16 --with-float=hard --with-abi=aapcs-linux --with-mode=thumb'}
+          - {arch_type: 'i486-linux-musl', arch_config: '--with-arch=i486 --with-tune=generic --enable-cld'}
+          - {arch_type: 'i686-linux-musl', arch_config: '--with-arch=i686 --with-tune=generic --enable-cld'}
           # - {
           #     arch_type: 'm68k-linux-musl',
           #     arch_config: ''
@@ -111,82 +60,31 @@ jobs:
           #     arch_type: 'microblazeel-linux-musl',
           #     arch_config: ''
           #   } 
-          - {
-              arch_type: 'mips-linux-musl',
-              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
-            }
-          - {
-              arch_type: 'mips-linux-muslsf',
-              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
-            }
-          - {
-              arch_type: 'mips-linux-musln32sf',
-              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=n32'
-            }
-          - {
-              arch_type: 'mips64-linux-musl',
-              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64'
-            }
-          - {
-              arch_type: 'mips64-linux-musln32',
-              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
-            }
-          - {
-              arch_type: 'mips64-linux-musln32sf',
-              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
-            }
-          - {
-              arch_type: 'mips64el-linux-musl',
-              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64'
-            }
-          - {
-              arch_type: 'mips64el-linux-musln32',
-              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
-            }
-          - {
-              arch_type: 'mips64el-linux-musln32sf',
-              arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'
-            }
-          - {
-              arch_type: 'mipsel-linux-musl',
-              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
-            }
-          - {
-              arch_type: 'mipsel-linux-musln32',
-              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=n32'
-            }
-          - {
-              arch_type: 'mipsel-linux-musln32sf',
-              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=n32'
-            }
-          - {
-              arch_type: 'mipsel-linux-muslsf',
-              arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'
-            }
+          - {arch_type: 'mips-linux-musl', arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'}
+          - {arch_type: 'mips-linux-muslsf', arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'}
+          - {arch_type: 'mips-linux-musln32sf', arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=n32'}
+          - {arch_type: 'mips64-linux-musl', arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64'}
+          - {arch_type: 'mips64-linux-musln32', arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'}
+          - {arch_type: 'mips64-linux-musln32sf', arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'}
+          - {arch_type: 'mips64el-linux-musl', arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=64'}
+          - {arch_type: 'mips64el-linux-musln32', arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'}
+          - {arch_type: 'mips64el-linux-musln32sf', arch_config: '--with-arch=mips3 --with-tune=mips64 --with-mips-plt --with-float=soft --with-abi=n32'}
+          - {arch_type: 'mipsel-linux-musl', arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'}
+          - {arch_type: 'mipsel-linux-musln32', arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=n32'}
+          - {arch_type: 'mipsel-linux-musln32sf', arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=n32'}
+          - {arch_type: 'mipsel-linux-muslsf', arch_config: '--with-arch=mips32 --with-mips-plt --with-float=soft --with-abi=32'}
           # - {
           #     arch_type: 'or1k-linux-musl',
           #     arch_config: ''
           #   }
-          - {
-              arch_type: 'powerpc-linux-musl',
-              arch_config: '--enable-secureplt --enable-decimal-float=no'
-            }
+          - {arch_type: 'powerpc-linux-musl', arch_config: '--enable-secureplt --enable-decimal-float=no'}
           # - {
           #     arch_type: 'powerpc-linux-muslsf',
           #     arch_config: '--enable-secureplt --enable-decimal-float=no'
           #   }
-          - {
-              arch_type: 'powerpc64-linux-musl',
-              arch_config: '--with-abi=elfv2 --enable-secureplt --enable-decimal-float=no --enable-targets=powerpcle-linux'
-            }
-          - {
-              arch_type: 'powerpc64le-linux-musl',
-              arch_config: '--with-abi=elfv2 --enable-secureplt --enable-decimal-float=no --enable-targets=powerpcle-linux'
-            }
-          - {
-              arch_type: 'powerpcle-linux-musl',
-              arch_config: '--enable-secureplt --enable-decimal-float=no'
-            }
+          - {arch_type: 'powerpc64-linux-musl', arch_config: '--with-abi=elfv2 --enable-secureplt --enable-decimal-float=no --enable-targets=powerpcle-linux'}
+          - {arch_type: 'powerpc64le-linux-musl', arch_config: '--with-abi=elfv2 --enable-secureplt --enable-decimal-float=no --enable-targets=powerpcle-linux'}
+          - {arch_type: 'powerpcle-linux-musl', arch_config: '--enable-secureplt --enable-decimal-float=no'}
           # - {
           #     arch_type: 'powerpcle-linux-muslsf',
           #     arch_config: '--enable-secureplt --enable-decimal-float=no'
@@ -195,18 +93,9 @@ jobs:
           #     arch_type: 'riscv32-linux-musl',
           #     arch_config: ''
           #   }
-          - {
-              arch_type: 'riscv64-linux-musl',
-              arch_config: '--with-arch=rv64gc --with-abi=lp64d --enable-autolink-libatomic'
-            }
-          - {
-              arch_type: 's390x-linux-musl',
-              arch_config: '--with-arch=z196 --with-tune=zEC12 --with-zarch --with-long-double-128 --enable-decimal-float'
-            }
-          - {
-              arch_type: 'x86_64-linux-musl',
-              arch_config: ''
-            }
+          - {arch_type: 'riscv64-linux-musl', arch_config: '--with-arch=rv64gc --with-abi=lp64d --enable-autolink-libatomic'}
+          - {arch_type: 's390x-linux-musl', arch_config: '--with-arch=z196 --with-tune=zEC12 --with-zarch --with-long-double-128 --enable-decimal-float'}
+          - {arch_type: 'x86_64-linux-musl', arch_config: '',}
           # - {
           #     arch_type: 'x86_64-linux-muslx32',
           #     arch_config: ''
@@ -237,17 +126,14 @@ jobs:
           #   }
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: pkg-build
           fetch-depth: 1
           path: ./
-
       - name: apk install build deps
         run: >
-          apk add autoconf automake bash bison build-base gfortran
-          cmake ccache curl findutils flex git graphviz libarchive-tools libtool linux-headers ncurses-dev
-          patch perl pkgconf python3 python3-dev re2c rsync tar texinfo ttf-freefont xz zip
+          apk add autoconf automake bash bison build-base gfortran cmake ccache curl findutils flex git graphviz libarchive-tools libtool linux-headers ncurses-dev patch perl pkgconf python3 python3-dev re2c rsync tar texinfo ttf-freefont xz zip
 
       - name: Build native musl cross compiler targeting ${{ matrix.triples.arch_type }}
         env:
@@ -283,7 +169,6 @@ jobs:
           EOF
           make install -j$(nproc)
           make clean
-
       - name: Package musl cross toolchains
         env:
           TARGET: ${{ matrix.triples.arch_type }}
@@ -293,15 +178,13 @@ jobs:
 
           [ -h ${{ github.workspace }}/output/${TARGET}-cross/usr ] || (cd ${{ github.workspace }}/output/${TARGET}-cross && ln -s . usr)
           [ -e ${{ github.workspace }}/output/${TARGET}-cross.tgz ] || (cd ${{ github.workspace }}/output && tar pczf ${TARGET}-cross.tgz ${TARGET}-cross)
-      
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           path: ${{ github.workspace }}/output
           name: ${{ matrix.triples.arch_type }}
           if-no-files-found: error
           retention-days: ${{ env.ARTIFACT_RETENTION_DAYS }}
-
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
