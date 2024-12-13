@@ -141,7 +141,7 @@ musl-git-%:
 	mkdir $@.tmp
 	( cd $@.tmp && $(COWPATCH) -I ../$< )
 	test ! -d patches/$@ || cat patches/$@/* | ( cd $@.tmp && $(COWPATCH) -p1 )
-	if test -f $</configfsf.sub ; then cs=configfsf.sub ; elif test -f $</config.sub ; then cs=config.sub ; else exit 0 ; fi ; rm -f $@.tmp/$$cs && cp -f $(SOURCES)/config.sub $@.tmp/$$cs && chmod +x $@.tmp/$$cs
+	if test -f $</configfsf.sub ; then cs=configfsf.sub ; elif test -f $</config.sub ; then cs=config.sub ; elif test -f $</build-aux/config.sub ; then cs=build-aux/config.sub ; else exit 0 ; fi ; rm -f $@.tmp/$$cs && cp -f $(SOURCES)/config.sub $@.tmp/$$cs && chmod +x $@.tmp/$$cs
 	rm -rf $@
 	mv $@.tmp $@
 	$(COWPATCH) -S gcc-$(GCC_VER)/libstdc++-v3
